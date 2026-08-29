@@ -1,0 +1,19 @@
+# Unreal generated files
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+
+# Visual Studio generated files
+.vs/
+*.sln
+.vsconfig
+*.VC.db
+*.opensdf
+*.sdf
+*.suo
+*.user
+
+# Local backup/output files
+Backup/
+UpgradeLog.htm
