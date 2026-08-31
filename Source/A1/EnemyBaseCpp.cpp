@@ -1,16 +1,20 @@
 #include "EnemyBaseCpp.h"
-
 #include "Components/CapsuleComponent.h"
+#include "Components/SplineComponent.h"
 #include "PaperFlipbookComponent.h"
 #include "SoulRewardComponent.h"
+#include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
 
 AEnemyBaseCpp::AEnemyBaseCpp()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = true;
 
 	Capsule = CreateDefaultSubobject<UCapsuleComponent>(TEXT("Capsule"));
 	SetRootComponent(Capsule);
+	Capsule->SetCollisionProfileName(TEXT("OverlapAllDynamic"));
+	Capsule->SetGenerateOverlapEvents(true);
 
 	EnemySprite = CreateDefaultSubobject<UPaperFlipbookComponent>(TEXT("EnemySprite"));
 	EnemySprite->SetupAttachment(Capsule);
@@ -24,27 +28,114 @@ void AEnemyBaseCpp::BeginPlay()
 	Super::BeginPlay();
 
 	CurrentHP = FMath::Max(1.0f, MaxHP);
+	CurrentMoveSpeed = BaseMoveSpeed;
+	DistanceAlongSpline = 0.0f;
 
 	if (WalkFlipbook != nullptr)
 	{
 		EnemySprite->SetFlipbook(WalkFlipbook);
 		EnemySprite->PlayFromStart();
 	}
+
+	// Auto-find Spline Actor in level if not set
+	if (!TargetSpline)
+	{
+		TArray<AActor*> FoundActors;
+		UGameplayStatics::GetAllActorsWithTag(GetWorld(), FName("EnemyPath"), FoundActors);
+
+		if (FoundActors.Num() > 0)
+		{
+			TargetSpline = FoundActors[0]->FindComponentByClass<USplineComponent>();
+		}
+		else
+		{
+			// Fallback: search by class name containing Spline
+			TArray<AActor*> AllActors;
+			UGameplayStatics::GetAllActorsOfClass(GetWorld(), AActor::StaticClass(), AllActors);
+			for (AActor* Actor : AllActors)
+			{
+				if (IsValid(Actor) && Actor->GetClass()->GetName().Contains(TEXT("Spline")))
+				{
+					TargetSpline = Actor->FindComponentByClass<USplineComponent>();
+					if (TargetSpline)
+					{
+						break;
+					}
+				}
+			}
+		}
+	}
 }
 
-void AEnemyBaseCpp::ReceiveDamage(float DamageAmount)
+void AEnemyBaseCpp::Tick(float DeltaTime)
 {
-	if (bIsDead || DamageAmount <= 0.0f)
+	Super::Tick(DeltaTime);
+
+	if (!bIsDead)
+	{
+		UpdateSplineMovement(DeltaTime);
+	}
+}
+
+void AEnemyBaseCpp::UpdateSplineMovement(float DeltaTime)
+{
+	if (!TargetSpline)
 	{
 		return;
 	}
 
-	CurrentHP = FMath::Max(0.0f, CurrentHP - DamageAmount);
+	DistanceAlongSpline += CurrentMoveSpeed * DeltaTime;
+	const float SplineLength = TargetSpline->GetSplineLength();
+
+	if (DistanceAlongSpline >= SplineLength)
+	{
+		OnReachedEnd();
+		return;
+	}
+
+	const FVector NewLocation = TargetSpline->GetLocationAtDistanceAlongSpline(DistanceAlongSpline, ESplineCoordinateSpace::World);
+	const FRotator NewRotation = TargetSpline->GetRotationAtDistanceAlongSpline(DistanceAlongSpline, ESplineCoordinateSpace::World);
+
+	SetActorLocationAndRotation(NewLocation, NewRotation);
+}
+
+void AEnemyBaseCpp::ApplyDamage(float Amount)
+{
+	if (bIsDead || Amount <= 0.0f)
+	{
+		return;
+	}
+
+	CurrentHP = FMath::Max(0.0f, CurrentHP - Amount);
 
 	if (CurrentHP <= 0.0f)
 	{
 		Die();
 	}
+}
+
+void AEnemyBaseCpp::ApplySlow(float Multiplier, float Duration)
+{
+	if (bIsDead)
+	{
+		return;
+	}
+
+	CurrentMoveSpeed = BaseMoveSpeed * FMath::Clamp(Multiplier, 0.1f, 1.0f);
+
+	GetWorldTimerManager().ClearTimer(SlowTimerHandle);
+	GetWorldTimerManager().SetTimer(SlowTimerHandle, this, &AEnemyBaseCpp::ResetMoveSpeed, Duration, false);
+}
+
+void AEnemyBaseCpp::ResetMoveSpeed()
+{
+	CurrentMoveSpeed = BaseMoveSpeed;
+}
+
+void AEnemyBaseCpp::SetTargetSpline(USplineComponent* InSpline)
+{
+	TargetSpline = InSpline;
+	DistanceAlongSpline = 0.0f;
 }
 
 void AEnemyBaseCpp::Die()
@@ -55,6 +146,7 @@ void AEnemyBaseCpp::Die()
 	}
 
 	bIsDead = true;
+	GetWorldTimerManager().ClearTimer(SlowTimerHandle);
 	Capsule->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
 	if (SoulReward != nullptr)
@@ -72,9 +164,15 @@ void AEnemyBaseCpp::Die()
 	GetWorldTimerManager().SetTimer(DeathTimerHandle, this, &AEnemyBaseCpp::FinishDeath, DeathDestroyDelay, false);
 }
 
-bool AEnemyBaseCpp::IsDead() const
+void AEnemyBaseCpp::OnReachedEnd()
 {
-	return bIsDead;
+	// Enemy reached base / end of path
+	Destroy();
+}
+
+void AEnemyBaseCpp::FinishDeath()
+{
+	Destroy();
 }
 
 float AEnemyBaseCpp::GetHealthPercent() const
@@ -85,9 +183,4 @@ float AEnemyBaseCpp::GetHealthPercent() const
 	}
 
 	return CurrentHP / MaxHP;
-}
-
-void AEnemyBaseCpp::FinishDeath()
-{
-	Destroy();
 }
