@@ -91,9 +91,9 @@ bool ATowerSlot::BuildTower(TSubclassOf<ATowerBase> TowerToBuild, int32 SoulCost
 		return false;
 	}
 
-	// Calculate transform
+	// Calculate transform (lock rotation to zero to prevent unwanted tilting)
 	const FVector SpawnLocation = GetActorLocation() + TowerSpawnOffset;
-	const FRotator SpawnRotation = GetActorRotation();
+	const FRotator SpawnRotation = FRotator::ZeroRotator;
 
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -107,11 +107,14 @@ bool ATowerSlot::BuildTower(TSubclassOf<ATowerBase> TowerToBuild, int32 SoulCost
 		UE_LOG(LogTemp, Log, TEXT("BuildTower SUCCESS: Tower [%s] successfully spawned at %s! Remaining Souls: %d"),
 			*SpawnedTower->GetName(), *SpawnLocation.ToString(), SoulWallet->GetSoul());
 
-		// Disable slot collision so it does not interfere with the tower
+		// Disable slot collision so it does not interfere with the tower or block traces
 		if (ClickBox)
 		{
 			ClickBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		}
+
+		// Hide the entire slot actor (visual mesh / indicator plane) once the tower is built
+		SetActorHiddenInGame(true);
 	}
 	else
 	{
