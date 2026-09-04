@@ -1,0 +1,45 @@
+Game Playtesting Feedback and Improvements
+Number of Playtest Participants: 11
+1.UI Clarity and Functionality 
+Feedback:
+45.5% of participants believed that the UI was the area of the game that needed the most improvement.
+Issues Identified:
+Some important game information and controls were not clear enough during gameplay. The UI also had issues such as blurred backgrounds, and some functions were difficult to use or understand.
+Changes Made:
+We created a start menu to improve immersion and allow players to either start the game or exit directly. We also removed some unnecessary UI elements and implemented or adjusted several important functions, including tower placement and removal, remaining player health, soul count, wave number, and the countdown to the next wave.
+
+1.Controls and Game Instructions 
+Feedback:
+72.8% of players found the game easy or very easy to understand.
+However, 18.2% of players found the game difficult to understand, while 9.1% gave a neutral response.
+Issues Identified:
+Although the basic gameplay was relatively easy to understand, some players still needed clearer instructions about how to interact with the game.
+Changes Made:
+We improved the UI to help players understand the purpose of each part of the game more easily. One of the main approaches was to use familiar visual symbols so that players could understand their functions intuitively. For example, a green triangle represents continuing the game, while two white vertical lines represent pausing the game.
+We also added a portal to visually represent where enemies spawn and a core to represent the player’s health. These additions made the overall tower defence gameplay process easier for players to understand.
+
+1.Tower Variety 
+Feedback:
+Most players found the functions of the existing towers relatively clear.
+However, some players commented that there were not enough tower types in the current version, making it difficult to properly evaluate tower variety and balance.
+Issues Identified:
+The current prototype had a limited variety of towers.
+Changes Made:
+In addition to the basic Fire Tower, which deals single-target damage, we added an Ice Tower with a slowing effect and an Electric Tower with area-of-effect (AOE) damage.
+
+1.Attack Visual Feedback 
+Feedback:
+72.7% of participants found the tower attacks and visual effects very satisfying.
+However, one participant commented that the current attack effects looked somewhat static and basic.
+Issues Identified:
+Although the overall visual style received positive feedback, the visual feedback from attacks could still be more dynamic.
+Changes Made:
+We redrew the projectile animations and removed the background and blurred areas from the projectile assets. This allowed the projectiles to move more naturally and visually connect with enemies when attacking.
+
+1.Game Difficulty and Balance 
+Feedback:
+72.7% of participants believed that the overall game difficulty was appropriate.
+72.8% of players considered the towers to be mostly balanced or very balanced.
+Changes Made:
+Therefore, we kept the overall difficulty and tower balance close to the current settings. However, we made adjustments to tower statistics, enemy numbers, and enemy health to improve the balance of the game.
+These adjustments were intended to provide players with more strategic decision-making and make resource management more meaningful and enjoyable. As more towers and gameplay content are introduced in the future, further playtesting and balancing will still be required.
