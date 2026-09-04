@@ -11,15 +11,18 @@ AEnemyBaseCpp::AEnemyBaseCpp()
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = true;
 
+	// Root collision capsule
 	Capsule = CreateDefaultSubobject<UCapsuleComponent>(TEXT("Capsule"));
 	SetRootComponent(Capsule);
 	Capsule->SetCollisionProfileName(TEXT("OverlapAllDynamic"));
 	Capsule->SetGenerateOverlapEvents(true);
 
+	// 2D Sprite animation component
 	EnemySprite = CreateDefaultSubobject<UPaperFlipbookComponent>(TEXT("EnemySprite"));
 	EnemySprite->SetupAttachment(Capsule);
 	EnemySprite->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
+	// Soul reward component on death
 	SoulReward = CreateDefaultSubobject<USoulRewardComponent>(TEXT("SoulReward"));
 }
 
@@ -27,6 +30,7 @@ void AEnemyBaseCpp::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// Initialize runtime HP and movement speed from default stats
 	CurrentHP = FMath::Max(1.0f, MaxHP);
 	CurrentMoveSpeed = BaseMoveSpeed;
 	DistanceAlongSpline = 0.0f;
@@ -37,7 +41,7 @@ void AEnemyBaseCpp::BeginPlay()
 		EnemySprite->PlayFromStart();
 	}
 
-	// Auto-find Spline Actor in level if not set
+	// Auto-locate the Spline Actor in the level if not manually assigned
 	if (!TargetSpline)
 	{
 		TArray<AActor*> FoundActors;
@@ -49,7 +53,7 @@ void AEnemyBaseCpp::BeginPlay()
 		}
 		else
 		{
-			// Fallback: search by class name containing Spline
+			// Fallback: search for any actor with 'Spline' in its class name
 			TArray<AActor*> AllActors;
 			UGameplayStatics::GetAllActorsOfClass(GetWorld(), AActor::StaticClass(), AllActors);
 			for (AActor* Actor : AllActors)
@@ -87,6 +91,7 @@ void AEnemyBaseCpp::UpdateSplineMovement(float DeltaTime)
 	DistanceAlongSpline += CurrentMoveSpeed * DeltaTime;
 	const float SplineLength = TargetSpline->GetSplineLength();
 
+	// Handle reaching the end of the track
 	if (DistanceAlongSpline >= SplineLength)
 	{
 		OnReachedEnd();
@@ -121,6 +126,7 @@ void AEnemyBaseCpp::ApplySlow(float Multiplier, float Duration)
 		return;
 	}
 
+	// Clamp slow factor between 10% and 100% of original speed
 	CurrentMoveSpeed = BaseMoveSpeed * FMath::Clamp(Multiplier, 0.1f, 1.0f);
 
 	GetWorldTimerManager().ClearTimer(SlowTimerHandle);
@@ -149,24 +155,27 @@ void AEnemyBaseCpp::Die()
 	GetWorldTimerManager().ClearTimer(SlowTimerHandle);
 	Capsule->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
+	// Award souls to player
 	if (SoulReward != nullptr)
 	{
 		SoulReward->GrantSoulReward();
 	}
 
+	// Trigger death animation
 	if (DeathFlipbook != nullptr)
 	{
 		EnemySprite->SetFlipbook(DeathFlipbook);
 		EnemySprite->PlayFromStart();
 	}
 
+	// Delay actor destruction for death animation playback
 	FTimerHandle DeathTimerHandle;
 	GetWorldTimerManager().SetTimer(DeathTimerHandle, this, &AEnemyBaseCpp::FinishDeath, DeathDestroyDelay, false);
 }
 
 void AEnemyBaseCpp::OnReachedEnd()
 {
-	// Enemy reached base / end of path
+	// Target reached base; clean up actor instance
 	Destroy();
 }
 

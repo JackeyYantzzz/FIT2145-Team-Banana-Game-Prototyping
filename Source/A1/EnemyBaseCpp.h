@@ -20,14 +20,15 @@ public:
 
 	virtual void Tick(float DeltaTime) override;
 
-	// Damage interface called by projectiles
+	// Damage interface called when hit by projectiles
 	UFUNCTION(BlueprintCallable, Category = "Enemy|Combat")
 	virtual void ApplyDamage(float Amount);
 
-	// Slow debuff interface called by water projectiles
+	// Slow debuff interface called by status-effect projectiles (e.g., Ice Tower)
 	UFUNCTION(BlueprintCallable, Category = "Enemy|Combat")
 	virtual void ApplySlow(float Multiplier, float Duration);
 
+	// Assign target spline path for movement
 	UFUNCTION(BlueprintCallable, Category = "Enemy|Movement")
 	void SetTargetSpline(USplineComponent* InSpline);
 
@@ -43,6 +44,7 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
+	// Components
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UCapsuleComponent> Capsule;
 
@@ -52,12 +54,12 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USoulRewardComponent> SoulReward;
 
-	// Stats
+	// Core Stats (Configurable via Blueprint Defaults)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy|Stats")
-	float MaxHP = 100.0f;
+	float MaxHP = 35.0f;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|Stats")
-	float CurrentHP = 100.0f;
+	float CurrentHP = 35.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy|Stats")
 	float BaseMoveSpeed = 300.0f;
@@ -65,7 +67,7 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|Stats")
 	float CurrentMoveSpeed = 300.0f;
 
-	// Visuals
+	// Visual Animations
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Visual")
 	TObjectPtr<UPaperFlipbook> WalkFlipbook = nullptr;
 
@@ -75,7 +77,7 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Stats")
 	float DeathDestroyDelay = 0.6f;
 
-	// Spline Movement
+	// Spline Movement Tracking
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Enemy|Movement")
 	TObjectPtr<USplineComponent> TargetSpline = nullptr;
 
