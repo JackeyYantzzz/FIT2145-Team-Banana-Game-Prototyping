@@ -1,164 +1,200 @@
 #include "WaveSpawner.h"
+#include "EnemyBaseCpp.h"
+#include "CoffinEndPoint.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "TimerManager.h"
 
 AWaveSpawner::AWaveSpawner()
 {
-	PrimaryActorTick.bCanEverTick = false;
-	CurrentWaveIndex = 0;
-	CurrentSubWaveIndex = 0;
-	SpawnedInCurrentSubWave = 0;
-	SplinePathRef = nullptr;
-	WaveCountdownRemaining = 0.0f;
+    PrimaryActorTick.bCanEverTick = false;
+
+    CurrentWaveIndex = 0;
+    CurrentSubWaveIndex = 0;
+    SpawnedInCurrentSubWave = 0;
+
+    WaveCountdownRemaining = 0.0f;
+    SplinePathRef = nullptr;
 }
 
 void AWaveSpawner::BeginPlay()
 {
-	Super::BeginPlay();
-	StartNextWave();
+    Super::BeginPlay();
+
+    StartNextWave();
 }
 
 void AWaveSpawner::StartNextWave()
 {
-	// Reset countdown state
-	GetWorldTimerManager().ClearTimer(TimerHandle_WaveCountdown);
-	OnWaveCountdownChanged.Broadcast(0);
+    GetWorldTimerManager().ClearTimer(TimerHandle_WaveCountdown);
+    OnWaveCountdownChanged.Broadcast(0);
 
-	if (!Waves.IsValidIndex(CurrentWaveIndex))
-	{
-		return;
-	}
+    if (!Waves.IsValidIndex(CurrentWaveIndex))
+    {
+        return;
+    }
 
-	// Reset sub-wave tracking counters
-	CurrentSubWaveIndex = 0;
-	SpawnedInCurrentSubWave = 0;
+    CurrentSubWaveIndex = 0;
+    SpawnedInCurrentSubWave = 0;
 
-	// Notify UI of wave progress
-	OnWaveChanged.Broadcast(
-		CurrentWaveIndex + 1,
-		Waves.Num()
-	);
+    OnWaveChanged.Broadcast(
+        CurrentWaveIndex + 1,
+        Waves.Num()
+    );
 
-	const FWaveData& CurrentWave = Waves[CurrentWaveIndex];
+    const FWaveData& CurrentWave = Waves[CurrentWaveIndex];
 
-	// Start repeating timer for individual spawns
-	GetWorldTimerManager().SetTimer(
-		TimerHandle_SpawnEnemy,
-		this,
-		&AWaveSpawner::SpawnSingleEnemy,
-		CurrentWave.SpawnInterval,
-		true
-	);
+    GetWorldTimerManager().SetTimer(
+        TimerHandle_SpawnEnemy,
+        this,
+        &AWaveSpawner::SpawnSingleEnemy,
+        CurrentWave.SpawnInterval,
+        true
+    );
 }
 
 void AWaveSpawner::SpawnSingleEnemy()
 {
-	if (!Waves.IsValidIndex(CurrentWaveIndex))
-	{
-		return;
-	}
+    if (!Waves.IsValidIndex(CurrentWaveIndex))
+    {
+        return;
+    }
 
-	const FWaveData& CurrentWave = Waves[CurrentWaveIndex];
+    const FWaveData& CurrentWave = Waves[CurrentWaveIndex];
 
-	// Iterate through sub-waves to find the active group with remaining count
-	while (CurrentSubWaveIndex < CurrentWave.SubWaves.Num())
-	{
-		const FEnemySubWave& SubWave = CurrentWave.SubWaves[CurrentSubWaveIndex];
+    while (CurrentWave.SubWaves.IsValidIndex(CurrentSubWaveIndex))
+    {
+        const FEnemySubWave& CurrentSubWave =
+            CurrentWave.SubWaves[CurrentSubWaveIndex];
 
-		if (SpawnedInCurrentSubWave < SubWave.EnemyCount)
-		{
-			// Spawn enemy actor at spawner location
-			if (SubWave.EnemyClass && GetWorld())
-			{
-				FActorSpawnParameters SpawnParams;
-				SpawnParams.SpawnCollisionHandlingOverride =
-					ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+        if (SpawnedInCurrentSubWave < CurrentSubWave.EnemyCount)
+        {
+            if (CurrentSubWave.EnemyClass && GetWorld())
+            {
+                FActorSpawnParameters SpawnParams;
+                SpawnParams.SpawnCollisionHandlingOverride =
+                    ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-				const FTransform SpawnTransform = GetActorTransform();
+                GetWorld()->SpawnActor<AActor>(
+                    CurrentSubWave.EnemyClass,
+                    GetActorTransform(),
+                    SpawnParams
+                );
+            }
 
-				GetWorld()->SpawnActor<AActor>(
-					SubWave.EnemyClass,
-					SpawnTransform,
-					SpawnParams
-				);
-			}
+            SpawnedInCurrentSubWave++;
+            return;
+        }
 
-			SpawnedInCurrentSubWave++;
-			return; // Spawn one actor per timer tick
-		}
+        CurrentSubWaveIndex++;
+        SpawnedInCurrentSubWave = 0;
+    }
 
-		// Current enemy type completed, move to next sub-wave group
-		CurrentSubWaveIndex++;
-		SpawnedInCurrentSubWave = 0;
-	}
-
-	// All sub-waves in this wave completed
-	OnWaveCompleted();
+    OnWaveCompleted();
 }
 
 void AWaveSpawner::OnWaveCompleted()
 {
-	GetWorldTimerManager().ClearTimer(TimerHandle_SpawnEnemy);
+    GetWorldTimerManager().ClearTimer(TimerHandle_SpawnEnemy);
 
-	const float Delay = Waves[CurrentWaveIndex].NextWaveDelay;
+    if (!Waves.IsValidIndex(CurrentWaveIndex))
+    {
+        return;
+    }
 
-	CurrentWaveIndex++;
+    const float Delay = Waves[CurrentWaveIndex].NextWaveDelay;
 
-	// All waves finished
-	if (!Waves.IsValidIndex(CurrentWaveIndex))
-	{
-		OnWaveCountdownChanged.Broadcast(0);
-		return;
-	}
+    CurrentWaveIndex++;
 
-	// Initialize and broadcast intermission countdown
-	WaveCountdownRemaining = Delay;
+    if (!Waves.IsValidIndex(CurrentWaveIndex))
+    {
+        OnWaveCountdownChanged.Broadcast(0);
 
-	OnWaveCountdownChanged.Broadcast(
-		FMath::CeilToInt(WaveCountdownRemaining)
-	);
+        GetWorldTimerManager().SetTimer(
+            TimerHandle_CheckVictory,
+            this,
+            &AWaveSpawner::CheckForVictory,
+            0.5f,
+            true
+        );
 
-	// Start countdown tick timer (every 1.0 second)
-	GetWorldTimerManager().SetTimer(
-		TimerHandle_WaveCountdown,
-		this,
-		&AWaveSpawner::UpdateWaveCountdown,
-		1.0f,
-		true
-	);
+        return;
+    }
 
-	// Schedule the start of the next wave
-	GetWorldTimerManager().SetTimer(
-		TimerHandle_NextWave,
-		this,
-		&AWaveSpawner::StartNextWave,
-		Delay,
-		false
-	);
+    WaveCountdownRemaining = Delay;
+
+    OnWaveCountdownChanged.Broadcast(
+        FMath::CeilToInt(WaveCountdownRemaining)
+    );
+
+    GetWorldTimerManager().SetTimer(
+        TimerHandle_WaveCountdown,
+        this,
+        &AWaveSpawner::UpdateWaveCountdown,
+        1.0f,
+        true
+    );
+
+    GetWorldTimerManager().SetTimer(
+        TimerHandle_NextWave,
+        this,
+        &AWaveSpawner::StartNextWave,
+        Delay,
+        false
+    );
 }
 
 void AWaveSpawner::UpdateWaveCountdown()
 {
-	WaveCountdownRemaining -= 1.0f;
+    WaveCountdownRemaining -= 1.0f;
 
-	if (WaveCountdownRemaining <= 0.0f)
-	{
-		GetWorldTimerManager().ClearTimer(TimerHandle_WaveCountdown);
-		OnWaveCountdownChanged.Broadcast(0);
-		return;
-	}
+    if (WaveCountdownRemaining <= 0.0f)
+    {
+        GetWorldTimerManager().ClearTimer(TimerHandle_WaveCountdown);
+        OnWaveCountdownChanged.Broadcast(0);
+        return;
+    }
 
-	OnWaveCountdownChanged.Broadcast(
-		FMath::CeilToInt(WaveCountdownRemaining)
-	);
+    OnWaveCountdownChanged.Broadcast(
+        FMath::CeilToInt(WaveCountdownRemaining)
+    );
+}
+
+void AWaveSpawner::CheckForVictory()
+{
+    if (GetWorld() == nullptr)
+    {
+        return;
+    }
+
+    for (TActorIterator<ACoffinEndPoint> It(GetWorld()); It; ++It)
+    {
+        if (IsValid(*It) && It->IsGameOver())
+        {
+            GetWorldTimerManager().ClearTimer(TimerHandle_CheckVictory);
+            return;
+        }
+    }
+
+    for (TActorIterator<AEnemyBaseCpp> It(GetWorld()); It; ++It)
+    {
+        if (IsValid(*It))
+        {
+            return;
+        }
+    }
+
+    GetWorldTimerManager().ClearTimer(TimerHandle_CheckVictory);
+
+    OnAllWavesCompleted.Broadcast();
 }
 
 int32 AWaveSpawner::GetCurrentWave() const
 {
-	return CurrentWaveIndex + 1;
+    return FMath::Min(CurrentWaveIndex + 1, Waves.Num());
 }
 
 int32 AWaveSpawner::GetTotalWaves() const
 {
-	return Waves.Num();
+    return Waves.Num();
 }
